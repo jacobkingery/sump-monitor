@@ -70,6 +70,7 @@ def sendSMS(no, lvl, last):
     return last
 
 try:
+    GPIO.setwarnings(False)
     readPin = 7
     writePins = [11, 12, 13, 15, 16, 18, 22]    # From lowest to highest (physically)
     pinSetup(readPin, writePins)
