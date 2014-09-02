@@ -44,10 +44,9 @@ def logData(bl):
 
     # Try sending data to server; clear backlog if it works
     try:
-        url = py.plot(data, filename='test plot', fileopt='extend', auto_open=False)
+        url = py.plot(data, filename='sump-monitor-archive', fileopt='extend', auto_open=False)
         return {'x':[], 'y':[]}
     except:
-        print len(bl['x'])
         return bl
 
 def sendSMS(no, lvl, last):
@@ -55,7 +54,7 @@ def sendSMS(no, lvl, last):
     delta = now - last
 
     # If it has been enough time since the last SMS, try to send the warning up to 5 times
-    if delta.total_seconds() > 7200:
+    if delta.total_seconds() > 3600:
         atmpt = 5
         while atmpt:
             try:
@@ -76,7 +75,7 @@ try:
     pinSetup(readPin, writePins)
 
     try:
-        with open('phonenumber.txt') as f:
+        with open('/root/sump-monitor/phonenumber.txt') as f:
             phoneNo = f.readline().strip()
     except:
         phoneNo = 0
@@ -84,7 +83,7 @@ try:
     lastMsg = dt.datetime.min
 
     try:
-        with open('streamID.txt') as f:
+        with open('/root/sump-monitor/streamID.txt') as f:
             streamID = f.readline().strip()
     except:
         streamID = 0
@@ -102,26 +101,13 @@ try:
         if streamID:
             streamData(streamID, timestamp, level)
 
-        # send every <x> data points to archive
+        # send every 10 data points to archive
         backlog['x'].append(timestamp)
         backlog['y'].append(level)
-    
-        if len(backlog['x']) > 5:
+        if len(backlog['x']) >= 10:
             backlog = logData(backlog)
 
-        time.sleep(5)
+        time.sleep(60)
 
 except:
     GPIO.cleanup()
-    sent = 0
-    while not sent:
-        try:
-            print 'Attempting to send text message...'
-            subprocess.call(['curl', 'http://textbelt.com/text', 
-                '-d', 'number={0}'.format(phoneNo), 
-                '-d', "message=An error occurred"
-            ]) 
-            sent = 1   
-        except:
-            time.sleep(30)
-            

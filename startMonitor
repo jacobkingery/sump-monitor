@@ -1,0 +1,7 @@
+#!/usr/bin/sh
+sleep 30
+while :
+do
+  python2 /root/sump-monitor/monitor.py
+  sleep 1
+done
