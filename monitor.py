@@ -50,10 +50,12 @@ def logData(bl):
         return bl
 
 def postData(ts, lvl):
+    strts = ts.strftime('%m/%d/%y %H:%M:%S')
     atmpt = 5
     while atmpt:
         try:
             subprocess.call(['curl', 'http://sump.herokuapp.com/update',
+                '-d', 'timestamp={0}'.format(strts),
                 '-d', 'level={0}'.format(lvl)
             ])
             return
