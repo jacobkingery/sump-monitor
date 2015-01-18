@@ -98,8 +98,9 @@ try:
             lastMsg = sendSMS(phoneNo, level, lastMsg)
 
         # send every data point to stream
-        if streamID:
-            streamData(streamID, timestamp, level)
+        # disabling because it wasn't working
+        # if streamID:
+        #     streamData(streamID, timestamp, level)
 
         # send every 10 data points to archive
         backlog['x'].append(timestamp)
