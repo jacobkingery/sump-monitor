@@ -49,6 +49,18 @@ def logData(bl):
     except:
         return bl
 
+def postData(ts, lvl):
+    atmpt = 5
+    while atmpt:
+        try:
+            subprocess.call(['curl', 'http://sump.herokuapp.com/update',
+                '-d', 'level={0}'.format(lvl)
+            ])
+            return
+        except:
+            atmpt -= 1
+            time.sleep(5)
+
 def sendSMS(no, lvl, last):
     now = dt.datetime.now()
     delta = now - last
@@ -101,6 +113,9 @@ try:
         # disabling because it wasn't working
         # if streamID:
         #     streamData(streamID, timestamp, level)
+
+        # POST data to status site
+        postData(timestamp, level)
 
         # send every 10 data points to archive
         backlog['x'].append(timestamp)
