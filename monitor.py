@@ -4,7 +4,9 @@ import RPi.GPIO as GPIO
 import plotly.plotly as py
 from plotly.graph_objs import Scatter, Data
 import datetime as dt
-import time, subprocess
+import time
+import subprocess
+import json
 
 def pinSetup(rP, wPs):
     GPIO.setmode(GPIO.BOARD)
@@ -23,18 +25,6 @@ def getLevel(rP, wPs):
         if not i:
             return 0
 
-def streamData(id, ts, lvl):
-    data = {'x':ts, 'y':lvl}
-
-    # Try streaming to server; ignore if it fails
-    try:
-        s = py.Stream(id)
-        s.open()
-        s.write(data)
-        s.close()
-    except:
-        pass
-
 def logData(bl):
     trace = Scatter(
         x = bl['x'],
@@ -49,12 +39,12 @@ def logData(bl):
     except:
         return bl
 
-def postData(ts, lvl):
+def postData(url, ts, lvl):
     strts = ts.strftime('%m/%d/%y %H:%M:%S')
     atmpt = 5
     while atmpt:
         try:
-            subprocess.call(['curl', 'http://sump.herokuapp.com/update',
+            subprocess.call(['curl', url,
                 '-d', 'timestamp={0}'.format(strts),
                 '-d', 'level={0}'.format(lvl)
             ])
@@ -88,19 +78,21 @@ try:
     writePins = [11, 12, 13, 15, 16, 18, 22]    # From lowest to highest (physically)
     pinSetup(readPin, writePins)
 
-    try:
-        with open('/root/sump-monitor/phonenumber.txt') as f:
-            phoneNo = f.readline().strip()
-    except:
-        phoneNo = 0
-
+    # Last message was as long ago as possible
     lastMsg = dt.datetime.min
 
+    with open('/root/sump-monitor/config.json') as f:
+        config = json.load(f)
+
     try:
-        with open('/root/sump-monitor/streamID.txt') as f:
-            streamID = f.readline().strip()
-    except:
-        streamID = 0
+        phoneNo = config['phoneNo']
+    except KeyError:
+        phoneNo = None
+
+    try:
+        postURL = config['postURL']
+    except KeyError:
+        postURL = None
 
     backlog = {'x':[], 'y':[]}
 
@@ -108,16 +100,13 @@ try:
         level = getLevel(readPin, writePins)
         timestamp = dt.datetime.now()
 
+        # Send warning text message
         if level >= 6 and phoneNo:
             lastMsg = sendSMS(phoneNo, level, lastMsg)
 
-        # send every data point to stream
-        # disabling because it wasn't working
-        # if streamID:
-        #     streamData(streamID, timestamp, level)
-
         # POST data to status site
-        postData(timestamp, level)
+        if postURL:
+            postData(postURL, timestamp, level)
 
         # send every 10 data points to archive
         backlog['x'].append(timestamp)
