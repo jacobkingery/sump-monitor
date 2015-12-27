@@ -22,8 +22,7 @@ def getLevel(rP, wPs):
         GPIO.output(wPs[i], 0)
         if connected:
             return i+1
-        if not i:
-            return 0
+    return 0
 
 def logData(bl):
     trace = Scatter(
@@ -108,7 +107,7 @@ try:
         if postURL:
             postData(postURL, timestamp, level)
 
-        # send every 10 data points to archive
+        # Send every 10 data points to archive
         backlog['x'].append(timestamp)
         backlog['y'].append(level)
         if len(backlog['x']) >= 10:
