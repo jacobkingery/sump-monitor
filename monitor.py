@@ -27,7 +27,7 @@ def getLevel(rP, wPs):
 def logData(bl):
     trace = Scatter(
         x = bl['x'],
-        y = bl['y']
+        y = bl['y'],
     )
     data = Data([trace])
 
@@ -38,19 +38,20 @@ def logData(bl):
     except:
         return bl
 
-def postData(url, ts, lvl):
-    strts = ts.strftime('%m/%d/%y %H:%M:%S')
-    atmpt = 5
-    while atmpt:
+def postData(url, batch):
+    payload = json.dumps({'readings': batch})
+    attempt = 5
+    while attempt:
         try:
             subprocess.call(['curl', url,
-                '-d', 'timestamp={0}'.format(strts),
-                '-d', 'level={0}'.format(lvl)
+                '-H', 'Content-Type: application/json',
+                '-d', payload,
             ])
-            return
+            return []
         except:
-            atmpt -= 1
-            time.sleep(5)
+            attempt -= 1
+            time.sleep(5 - attempt)
+    return batch
 
 def sendSMS(no, lvl, last):
     now = dt.datetime.now()
@@ -94,6 +95,7 @@ try:
         postURL = None
 
     backlog = {'x':[], 'y':[]}
+    batch = []
 
     while 1:
         level = getLevel(readPin, writePins)
@@ -103,9 +105,14 @@ try:
         if level >= 6 and phoneNo:
             lastMsg = sendSMS(phoneNo, level, lastMsg)
 
-        # POST data to status site
+        # POST data to status site every 3 data points
         if postURL:
-            postData(postURL, timestamp, level)
+            batch.append({
+                'timestamp': timestamp.strftime('%m/%d/%y %H:%M:%S'),
+                'level': level,
+            })
+            if len(batch) >= 3:
+                batch = postData(postURL, batch)
 
         # Send every 10 data points to archive
         backlog['x'].append(timestamp)
