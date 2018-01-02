@@ -5,6 +5,7 @@ import plotly.plotly as py
 from plotly.graph_objs import Scatter, Data
 import datetime as dt
 import time
+import smtplib
 import subprocess
 import json
 
@@ -53,24 +54,28 @@ def postData(url, batch):
             time.sleep(5 - attempt)
     return batch
 
-def sendSMS(no, lvl, last):
+def sendSMS(fromGmail, fromGmailPassword, toAddr, level, lastTime):
     now = dt.datetime.now()
-    delta = now - last
+    delta = now - lastTime
 
-    # If it has been enough time since the last SMS, try to send the warning up to 5 times
-    if delta.total_seconds() > 3600:
-        atmpt = 5
-        while atmpt:
-            try:
-                subprocess.call(['curl', 'http://textbelt.com/text',
-                    '-d', 'number={0}'.format(no),
-                    '-d', "message=Water in sump hole has reached level {0}.".format(lvl)
-                ])
-                return now
-            except:
-                atmpt -= 1
-                time.sleep(10)
-    return last
+    # Don't send more than one SMS per hour
+    if delta.total_seconds() < 3600:
+        return lastTime
+
+    message = 'Water in sump hole has reached level {}.'.format(level)
+    attempt = 5
+    while attempt:
+        try:
+            emailServer = smtplib.SMTP('smtp.gmail.com', 587)
+            emailServer.starttls()
+            emailServer.login(fromGmail, fromGmailPassword)
+            emailServer.sendmail(fromGmail, toAddr, message)
+            emailServer.quit()
+            return now
+        except:
+            attempt -= 1
+            time.sleep(5 - attempt)
+    return lastTime
 
 try:
     GPIO.setwarnings(False)
@@ -84,15 +89,12 @@ try:
     with open('/root/sump-monitor/config.json') as f:
         config = json.load(f)
 
-    try:
-        phoneNo = config['phoneNo']
-    except KeyError:
-        phoneNo = None
+    fromGmail = config.get('fromGmail', None)
+    fromGmailPassword = config.get('fromGmailPassword', None)
+    toAddr = config.get('toAddr', None)
+    canSMS = fromGmail and fromGmailPassword and toAddr
 
-    try:
-        postURL = config['postURL']
-    except KeyError:
-        postURL = None
+    postURL = config.get('postURL', None)
 
     backlog = {'x':[], 'y':[]}
     batch = []
@@ -102,8 +104,8 @@ try:
         timestamp = dt.datetime.now()
 
         # Send warning text message
-        if level >= 6 and phoneNo:
-            lastMsg = sendSMS(phoneNo, level, lastMsg)
+        if canSMS and level >= 6:
+            lastMsg = sendSMS(fromGmail, fromGmailPassword, toAddr, level, lastMsg)
 
         # POST data to status site every 3 data points
         if postURL:
@@ -113,12 +115,19 @@ try:
             })
             if len(batch) >= 3:
                 batch = postData(postURL, batch)
+            # If batch grows too big, drop some
+            if len(batch) > 30:
+                batch = batch[-30:]
 
         # Send every 10 data points to archive
         backlog['x'].append(timestamp)
         backlog['y'].append(level)
         if len(backlog['x']) >= 10:
             backlog = logData(backlog)
+        # If backlog grows too big, drop some
+        if len(backlog['x']) > 100:
+            backlog['x'] = backlog['x'][-100:]
+            backlog['y'] = backlog['y'][-100:]
 
         time.sleep(60)
 

@@ -1,1 +1,1 @@
-Raspberry Pi, plot.ly, and textbelt.com come together to form a sump pump monitoring system.
+A sump pump monitoring system that sends SMS warning messages and posts readings to plot.ly and a realtime graph webapp.

@@ -1,4 +1,6 @@
 {
-    "phoneNo": "PHONENUMBER", 
+    "fromGmail": "ADDRESS@gmail.com",
+    "fromGmailPassword": "PASSWORD",
+    "toAddr": "PHONENUMBER@GATEWAYDOMAIN",
     "postURL": "URL"
 }
