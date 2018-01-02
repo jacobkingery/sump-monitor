@@ -6,8 +6,8 @@ from plotly.graph_objs import Scatter, Data
 import datetime as dt
 import time
 import smtplib
-import subprocess
 import json
+import requests
 
 def pinSetup(rP, wPs):
     GPIO.setmode(GPIO.BOARD)
@@ -41,13 +41,13 @@ def logData(bl):
 
 def postData(url, batch):
     payload = json.dumps({'readings': batch})
+    headers = {'Content-Type': 'application/json'}
     attempt = 5
     while attempt:
         try:
-            subprocess.call(['curl', url,
-                '-H', 'Content-Type: application/json',
-                '-d', payload,
-            ])
+            response = requests.post(url, data=payload, headers=headers)
+            assert response.status_code == 200
+            assert response.json().get('success', False) is True
             return []
         except:
             attempt -= 1
