@@ -9,6 +9,8 @@ import smtplib
 import json
 import requests
 
+import temp
+
 def pinSetup(rP, wPs):
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(readPin, GPIO.IN)
@@ -24,6 +26,19 @@ def getLevel(rP, wPs):
         if connected:
             return i+1
     return 0
+
+def getTemps(ts):
+    readings = temp.read_temps()
+    zone = 1
+    temps = []
+    for reading in readings:
+        temps.append({
+            'timestamp': ts,
+            'zone': zone,
+            'temp': reading,
+        })
+        zone += 1
+    return temps
 
 def logData(bl):
     trace = Scatter(
@@ -48,7 +63,7 @@ def postData(url, batch):
             response = requests.post(url, data=payload, headers=headers)
             assert response.status_code == 200
             assert response.json().get('success', False) is True
-            return []
+            return {'sump': [], 'temp': []}
         except:
             attempt -= 1
             time.sleep(5 - attempt)
@@ -79,7 +94,7 @@ def sendSMS(fromGmail, fromGmailPassword, toAddr, level, lastTime):
 
 try:
     GPIO.setwarnings(False)
-    readPin = 7
+    readPin = 10
     writePins = [11, 12, 13, 15, 16, 18, 22]    # From lowest to highest (physically)
     pinSetup(readPin, writePins)
 
@@ -96,12 +111,21 @@ try:
 
     postURL = config.get('postURL', None)
 
+    lastTempHour = -1
+
     backlog = {'x':[], 'y':[]}
-    batch = []
+    batch = {'sump': [], 'temp': []}
 
     while 1:
-        level = getLevel(readPin, writePins)
         timestamp = dt.datetime.now()
+        ts_str = timestamp.strftime('%m/%d/%y %H:%M:%S')
+        level = getLevel(readPin, writePins)
+
+        # read temps only once an hour
+        temps = []
+        if timestamp.hour != lastTempHour:
+            temps = getTemps(ts_str)
+            lastTempHour = timestamp.hour
 
         # Send warning text message
         if canSMS and level >= 6:
@@ -109,15 +133,20 @@ try:
 
         # POST data to status site every 3 data points
         if postURL:
-            batch.append({
-                'timestamp': timestamp.strftime('%m/%d/%y %H:%M:%S'),
+            batch['sump'].append({
+                'timestamp': ts_str,
                 'level': level,
             })
-            if len(batch) >= 3:
+            batch['temp'].extend(temps)
+
+            if len(batch['sump']) >= 3:
                 batch = postData(postURL, batch)
+
             # If batch grows too big, drop some
-            if len(batch) > 30:
-                batch = batch[-30:]
+            if len(batch['sump']) > 30:
+                batch['sump'] = batch['sump'][-30:]
+            if len(batch['temp']) > 10:
+                batch['temp'] = batch['temp'][-10:]
 
         # Send every 10 data points to archive
         backlog['x'].append(timestamp)
